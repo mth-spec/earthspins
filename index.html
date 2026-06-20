@@ -28,7 +28,7 @@
 
     <script>
         // --- ゲームの状態管理（ステート） ---
-        let gameState = "WAIT_INITIAL_KEY"; // WAIT_INITIAL_KEY, INTRO, MODE_SELECT, READY_TO_START, PLAYING, ANSWER_SELECT
+        let gameState = "WAIT_INITIAL_KEY"; 
         let selectedMode = ""; 
         let currentEarthCount = 0; 
         let finalCorrectAnswer = 0; 
@@ -37,6 +37,9 @@
         
         let currentSource = null; 
         let gameLoopTimeout = null;
+
+        // ★【大改造】ブラウザの「自動スペース信号」を完全に弾くための厳重な防壁フラグ
+        let modeSelectionDone = false; 
 
         // 音声認識（Web Speech API）の準備
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -65,19 +68,31 @@
             kettei: "kettei.mp3"
         };
 
-        // --- キーボード入力の処理 ---
-        window.addEventListener("keydown", (event) => {
-            if (isAudioPlaying) return; // 音声再生中はキーをガードするなのだ
+        // ★【大改造】keydown（押し込まれた瞬間）ではなく、keyup（指が完全に離れた瞬間）で判定するのだ！
+        window.addEventListener("keyup", (event) => {
+            if (isAudioPlaying) return; 
 
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
                     initAudio();
                     startIntroFlow(); 
                 }
             } else if (gameState === "READY_TO_START") {
-                // ★ここでスペースキーが押されたら、④・⑨のスタート音を鳴らして本編へ行くのだ！
-                if (event.key === " ") {
+                // 音声認識が確定した時のブラウザの嘘信号を弾き、人間の指が「離れた」本物のスペースキーだけを通すのだ！
+                if (event.key === " " && modeSelectionDone) {
+                    event.preventDefault();
+                    modeSelectionDone = false; // フラグをリセットしてスタートなのだ！
                     triggerGameStart();
+                }
+            }
+        });
+
+        // キーが押し込まれた時の不要なブラウザ標準動作（スクロールなど）だけを事前に潰しておくのだ
+        window.addEventListener("keydown", (event) => {
+            if (event.key === " " || event.key === "Enter") {
+                if (gameState === "WAIT_INITIAL_KEY" || gameState === "READY_TO_START") {
+                    event.preventDefault();
                 }
             }
         });
@@ -163,6 +178,7 @@
 
         // ③ 難易度選択（および ⑧の再選択）
         async function askModeSelection() {
+            modeSelectionDone = false; // モード選択開始時はまだキー入力を受け付けないのだ
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
@@ -170,14 +186,20 @@
             startVoiceRecognition(handleModeResult);
         }
 
-        // ★声を聞き取ったあと、ここで確実に「スペースキー待ち」にする新関数なのだ！
+        // 声を聞き取ったあと、確実にプレイヤーのスペースキー入力を待つ関数
         function prepareForStart() {
             gameState = "READY_TO_START";
             updateText("スペースキーを押すとカウントダウンが始まるのだ！");
-            isAudioPlaying = false; // プレイヤーがいつでもスペースキーを押せる状態にするのだ
+            
+            // 音声認識が完全に終わってから、人間の手による次の「本物のkeyup（指を離す動作）」だけを許可するのだ！
+            setTimeout(() => {
+                modeSelectionDone = true; 
+                isAudioPlaying = false;
+                console.log("【防壁解除】本当のスペースキー入力を待機中なのだ！");
+            }, 100); 
         }
 
-        // ★スペースキーが押された瞬間に、④・⑨のスタート音を鳴らして本編へ進むのだ！
+        // ★スペースキーが手動で押されて「指が離れた瞬間にのみ」ここを通るのだ！
         async function triggerGameStart() {
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
             await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
@@ -304,14 +326,13 @@
             };
         }
 
-        // 難易度の声を聞き取ったら、勝手に始めずに「スペースキー待ち状態」へ移行させるのだ！
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                prepareForStart(); // 👈 勝手に始めず、スペースキーを待つストッパーを起動！
+                prepareForStart(); // 待機状態へ
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                prepareForStart(); // 👈 同上なのだ！
+                prepareForStart(); // 待機状態へ
             } else {
                 askModeSelection();
             }
