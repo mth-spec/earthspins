@@ -28,7 +28,7 @@
 
     <script>
         // --- ゲームの状態管理（ステート） ---
-        let gameState = "WAIT_INITIAL_KEY"; 
+        let gameState = "WAIT_INITIAL_KEY"; // WAIT_INITIAL_KEY, INTRO, MODE_SELECT, READY_TO_START, PLAYING, ANSWER_SELECT
         let selectedMode = ""; 
         let currentEarthCount = 0; 
         let finalCorrectAnswer = 0; 
@@ -67,10 +67,17 @@
 
         // --- キーボード入力の処理 ---
         window.addEventListener("keydown", (event) => {
+            if (isAudioPlaying) return; // 音声再生中はキーをガードするなのだ
+
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     initAudio();
                     startIntroFlow(); 
+                }
+            } else if (gameState === "READY_TO_START") {
+                // ★ここでスペースキーが押されたら、④・⑨のスタート音を鳴らして本編へ行くのだ！
+                if (event.key === " ") {
+                    triggerGameStart();
                 }
             }
         });
@@ -163,7 +170,21 @@
             startVoiceRecognition(handleModeResult);
         }
 
-        // ⑤ 本編再生（※スタート音は前の関数へ引っ越したのだ）
+        // ★声を聞き取ったあと、ここで確実に「スペースキー待ち」にする新関数なのだ！
+        function prepareForStart() {
+            gameState = "READY_TO_START";
+            updateText("スペースキーを押すとカウントダウンが始まるのだ！");
+            isAudioPlaying = false; // プレイヤーがいつでもスペースキーを押せる状態にするのだ
+        }
+
+        // ★スペースキーが押された瞬間に、④・⑨のスタート音を鳴らして本編へ進むのだ！
+        async function triggerGameStart() {
+            updateText("ゲームスタート！心の中で30秒を測るのだ！");
+            await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
+            startGamePlay(); 
+        }
+
+        // ⑤ 本編再生
         function startGamePlay() {
             gameState = "PLAYING";
             
@@ -254,6 +275,7 @@
                 await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
+            // ⑧ ループ処理！自動的に次の難易度選択（⑧）へ戻るのだ
             askModeSelection();
         }
 
@@ -282,18 +304,14 @@
             };
         }
 
-        // ★【バグ修正箇所】async/awaitを導入し、スタート音を鳴らし終わってから本編へ進むようにしたのだ！
-        async function handleModeResult(transcript) {
+        // 難易度の声を聞き取ったら、勝手に始めずに「スペースキー待ち状態」へ移行させるのだ！
+        function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                updateText("ゲームスタート！心の中で30秒を測るのだ！");
-                await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
-                startGamePlay(); 
+                prepareForStart(); // 👈 勝手に始めず、スペースキーを待つストッパーを起動！
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                updateText("ゲームスタート！心の中で30秒を測るのだ！");
-                await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
-                startGamePlay(); 
+                prepareForStart(); // 👈 同上なのだ！
             } else {
                 askModeSelection();
             }
