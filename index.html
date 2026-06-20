@@ -18,19 +18,18 @@
             text-align: center;
         }
         h1 { font-size: 2.5rem; margin-bottom: 20px; }
-        p { font-size: 1.5rem; max-width: 600px; line-height: 1.6; }
-        .status { font-weight: bold; color: #e3f9e3; margin-top: 20px; }
+        /* 文字エリアを1つに絞り、読み上げやすく見えやすいデザインにしたのだ */
+        p { font-size: 1.5rem; max-width: 600px; line-height: 1.6; font-weight: bold; color: #e3f9e3; }
     </style>
 </head>
 <body>
 
     <h1>地球が何回回った日？</h1>
-    <p id="instruction">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
-    <p id="game-status" class="status" aria-live="polite"></p>
+    <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
 
     <script>
         // --- ゲームの状態管理（ステート） ---
-        let gameState = "WAIT_INITIAL_KEY"; 
+        let gameState = "WAIT_INITIAL_KEY"; // WAIT_INITIAL_KEY, INTRO, MODE_SELECT, PLAYING, ANSWER_SELECT
         let selectedMode = ""; 
         let currentEarthCount = 0; 
         let finalCorrectAnswer = 0; 
@@ -69,16 +68,11 @@
 
         // --- キーボード入力の処理 ---
         window.addEventListener("keydown", (event) => {
-            if (isAudioPlaying || gameState === "PLAYING") return; 
-
+            // 最初の待機状態のときだけキー入力を受け付けるのだ
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     initAudio();
-                    startIntroFlow();
-                }
-            } else if (gameState === "READY_TO_START") {
-                if (event.key === " ") {
-                    startGamePlay();
+                    startIntroFlow(); // ①へ進むのだ
                 }
             }
         });
@@ -89,7 +83,7 @@
             }
         }
 
-        // 音声再生関数
+        // 音声再生関数（音が重ならない安全設計なのだ）
         function playAudio(url) {
             return new Promise((resolve, reject) => {
                 isAudioPlaying = true;
@@ -103,6 +97,7 @@
                     .then(response => response.arrayBuffer())
                     .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
                     .then(audioBuffer => {
+                        // プレイ中以外に地球やおかゆの音が残ってたら再生を遮断するのだ
                         if (url.includes("earth") || url.includes("okyu")) {
                             if (gameState !== "PLAYING") {
                                 isAudioPlaying = false;
@@ -134,7 +129,7 @@
             });
         }
 
-        // PCの合成音声でテキストを喋らせる関数
+        // PCの合成音声で正解の数値を読み上げる関数
         function speakText(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) {
@@ -154,57 +149,50 @@
         // ①・② イントロの流れ
         async function startIntroFlow() {
             gameState = "INTRO";
-            updateStatus("ずんだもんがお喋りしているのだ。耳をすませてね！");
+            updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title);
-            await playAudio(audioFiles.intro);
+            await playAudio(audioFiles.title); // ① タイトルの再生
+            await playAudio(audioFiles.intro); // ② ルール説明の再生
             
-            askModeSelection();
+            askModeSelection(); // ③へ自動進行！
         }
 
-        // ③ 難易度選択
+        // ③ 難易度選択（および ⑧の再選択）
         async function askModeSelection() {
             gameState = "MODE_SELECT";
-            updateStatus("初級か中級、どっちにするか声で教えてね！");
+            updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); 
+            await playAudio(audioFiles.sentaku); // ③・⑧ 難易度を選ばせるボイス
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④ ゲームスタートの待機案内
-        function prepareForStart() {
-            gameState = "READY_TO_START";
-            updateStatus("スペースキーを押すとカウントダウンが始まるのだ！");
-            isAudioPlaying = false; 
-        }
-
-        // ⑤ 本編（50秒間ランダム再生・30秒ロック）
+        // ④・⑨ ゲームスタートから ⑤の本編再生
         async function startGamePlay() {
             gameState = "PLAYING";
-            updateStatus("ゲームスタート！心の中で30秒を測るのだ！");
+            updateText("ゲームスタート！心の中で30秒を測るのだ！");
             
-            await playAudio(audioFiles.start); 
+            await playAudio(audioFiles.start); // ④・⑨ スタートの合図ボイス
             
             currentEarthCount = 0;
             finalCorrectAnswer = 0;
             let hasRecorded30s = false;
 
             const startTime = audioContext.currentTime;
-            const gameDuration = 50; 
+            const gameDuration = 50; // 50秒間流すなのだ
 
             async function playRandomLoop() {
                 if (gameState !== "PLAYING") return;
                 
                 const elapsedTime = audioContext.currentTime - startTime;
 
-                // 30秒経過した瞬間のカウントを正解として固定
+                // 30秒経過した瞬間のカウントを正解としてキープするのだ
                 if (elapsedTime >= 30 && !hasRecorded30s) {
                     finalCorrectAnswer = currentEarthCount;
                     hasRecorded30s = true;
-                    console.log("【30秒通過】正解を固定したのだ：", finalCorrectAnswer);
+                    console.log("【30秒通過】正解の数を固定したのだ：", finalCorrectAnswer);
                 }
 
-                // 50秒が経過したら、即座にループを完全に断ち切る
+                // ⑤ 50秒が経過したら即座にストップして⑥へ行くのだ
                 if (elapsedTime >= gameDuration) {
                     if (currentSource) {
                         try { currentSource.stop(); } catch(e) {}
@@ -217,8 +205,9 @@
                 let nextFile = "";
                 let isOkyu = false;
 
+                // ⑤ 初級と中級のランダム条件分岐なのだ
                 if (selectedMode === "中級" && Math.random() < 0.20) {
-                    nextFile = audioFiles.okyu_normal;
+                    nextFile = audioFiles.okyu_normal; // 中級なら20%でお灸
                     isOkyu = true;
                 } else {
                     const earthPool = [
@@ -246,35 +235,37 @@
             playRandomLoop();
         }
 
-        // ⑥ 50秒で音が停止、回答への誘導
+        // ⑥ 50秒で止めて回答へ誘導
         async function endGamePlay() {
             clearTimeout(gameLoopTimeout);
             gameState = "ANSWER_SELECT";
-            updateStatus("50秒経ったのだ！30秒の時の答えを言うのだ！");
+            updateText("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            await playAudio(audioFiles.kotaego);
+            await playAudio(audioFiles.kotaego); // ⑥ 答えを促すボイス
             startVoiceRecognition(handleAnswerResult);
         }
 
         // ⑦ プレイヤーの回答の判定
         async function handleAnswerResult(transcript) {
-            updateStatus(`あなたの答え: ${transcript}`);
+            updateText(`あなたの答え: ${transcript}`);
             
             const spokenNumber = transcript.replace(/[^0-9]/g, '');
             
-            await playAudio(audioFiles.kettei);
+            await playAudio(audioFiles.kettei); // 決定音
 
+            // ⑦ 正解・不正解の判定とボイス再生
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
-                updateStatus(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
-                await playAudio(audioFiles.seikai);
+                updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
+                await playAudio(audioFiles.seikai); // 正解ボイス
             } else {
-                updateStatus(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); 
+                updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
+                await playAudio(audioFiles.hazure); // 不正解ボイス
                 
+                // 不正解のあとにPC音声で正解を読み上げるのだ
                 await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
-            isAudioPlaying = false;
+            // ⑧・⑨ ループ処理！自動的に次の難易度選択（⑧）へ戻って繰り返すのだ
             askModeSelection();
         }
 
@@ -303,13 +294,14 @@
             };
         }
 
+        // 難易度の声を聞き取ったら、余計なキー入力を挟まずにすぐ④・⑨のスタートへ直行するのだ！
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                prepareForStart();
+                startGamePlay(); // 👈 ここで直接④・⑨の再生へジャンプ！
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                prepareForStart();
+                startGamePlay(); // 👈 同上なのだ！
             } else {
                 askModeSelection();
             }
@@ -328,9 +320,9 @@
             osc.stop(audioContext.currentTime + duration);
         }
 
-        // ★【バグ修正箇所】下の2行目のエリア（game-status）だけを綺麗に書き換えるようにしたのだ！
-        function updateStatus(text) {
-            document.getElementById("game-status").innerText = text;
+        // 単一のテキストエリアのみを書き換える、安全な新関数なのだ
+        function updateText(text) {
+            document.getElementById("game-text").innerText = text;
         }
     </script>
 </body>
