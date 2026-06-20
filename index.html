@@ -134,7 +134,7 @@
             });
         }
 
-        // PCの合成音声でテキストを喋らせる関数（不正解のときに大活躍なのだ！）
+        // PCの合成音声でテキストを喋らせる関数
         function speakText(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) {
@@ -143,7 +143,7 @@
                 }
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = "ja-JP";
-                utterance.rate = 1.0; // 読み上げ速度（標準）
+                utterance.rate = 1.0; 
                 utterance.onend = () => {
                     resolve();
                 };
@@ -171,11 +171,11 @@
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④ ゲームスタートの待機案内（※バグの原因だったkotaegoの先走りを完全削除！）
+        // ④ ゲームスタートの待機案内
         function prepareForStart() {
             gameState = "READY_TO_START";
             updateStatus("スペースキーを押すとカウントダウンが始まるのだ！");
-            isAudioPlaying = false; // すぐにプレイヤーのスペースキー入力を受け付ける状態にするなのだ！
+            isAudioPlaying = false; 
         }
 
         // ⑤ 本編（50秒間ランダム再生・30秒ロック）
@@ -252,7 +252,6 @@
             gameState = "ANSWER_SELECT";
             updateStatus("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            // ここで満を持して「30秒のときに言っていたのは地球が何回目だったのか〜」を再生！
             await playAudio(audioFiles.kotaego);
             startVoiceRecognition(handleAnswerResult);
         }
@@ -270,13 +269,11 @@
                 await playAudio(audioFiles.seikai);
             } else {
                 updateStatus(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); // まず「ハズレなのだ」ファイルを再生
+                await playAudio(audioFiles.hazure); 
                 
-                // ★【新機能】その直後に、PC音声が優しく正解を読み上げるのだ！
-                await speakText(`正解は、${finalCorrectAnswer}回でした。`); 
+                await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
-            // ⑧・⑨ 無限ループ処理で難易度選択へ戻る
             isAudioPlaying = false;
             askModeSelection();
         }
@@ -331,9 +328,9 @@
             osc.stop(audioContext.currentTime + duration);
         }
 
+        // ★【バグ修正箇所】下の2行目のエリア（game-status）だけを綺麗に書き換えるようにしたのだ！
         function updateStatus(text) {
             document.getElementById("game-status").innerText = text;
-            document.getElementById("instruction").innerText = text;
         }
     </script>
 </body>
