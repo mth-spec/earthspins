@@ -18,7 +18,6 @@
             text-align: center;
         }
         h1 { font-size: 2.5rem; margin-bottom: 20px; }
-        /* 文字エリアを1つに絞り、読み上げやすく見えやすいデザインにしたのだ */
         p { font-size: 1.5rem; max-width: 600px; line-height: 1.6; font-weight: bold; color: #e3f9e3; }
     </style>
 </head>
@@ -29,7 +28,7 @@
 
     <script>
         // --- ゲームの状態管理（ステート） ---
-        let gameState = "WAIT_INITIAL_KEY"; // WAIT_INITIAL_KEY, INTRO, MODE_SELECT, PLAYING, ANSWER_SELECT
+        let gameState = "WAIT_INITIAL_KEY"; 
         let selectedMode = ""; 
         let currentEarthCount = 0; 
         let finalCorrectAnswer = 0; 
@@ -68,11 +67,10 @@
 
         // --- キーボード入力の処理 ---
         window.addEventListener("keydown", (event) => {
-            // 最初の待機状態のときだけキー入力を受け付けるのだ
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     initAudio();
-                    startIntroFlow(); // ①へ進むのだ
+                    startIntroFlow(); 
                 }
             }
         });
@@ -83,7 +81,7 @@
             }
         }
 
-        // 音声再生関数（音が重ならない安全設計なのだ）
+        // 音声再生関数
         function playAudio(url) {
             return new Promise((resolve, reject) => {
                 isAudioPlaying = true;
@@ -97,7 +95,6 @@
                     .then(response => response.arrayBuffer())
                     .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
                     .then(audioBuffer => {
-                        // プレイ中以外に地球やおかゆの音が残ってたら再生を遮断するのだ
                         if (url.includes("earth") || url.includes("okyu")) {
                             if (gameState !== "PLAYING") {
                                 isAudioPlaying = false;
@@ -129,7 +126,7 @@
             });
         }
 
-        // PCの合成音声で正解の数値を読み上げる関数
+        // PCの合成音声関数
         function speakText(text) {
             return new Promise((resolve) => {
                 if (!window.speechSynthesis) {
@@ -151,10 +148,10 @@
             gameState = "INTRO";
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title); // ① タイトルの再生
-            await playAudio(audioFiles.intro); // ② ルール説明の再生
+            await playAudio(audioFiles.title); 
+            await playAudio(audioFiles.intro); 
             
-            askModeSelection(); // ③へ自動進行！
+            askModeSelection(); 
         }
 
         // ③ 難易度選択（および ⑧の再選択）
@@ -162,37 +159,32 @@
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); // ③・⑧ 難易度を選ばせるボイス
+            await playAudio(audioFiles.sentaku); 
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④・⑨ ゲームスタートから ⑤の本編再生
-        async function startGamePlay() {
+        // ⑤ 本編再生（※スタート音は前の関数へ引っ越したのだ）
+        function startGamePlay() {
             gameState = "PLAYING";
-            updateText("ゲームスタート！心の中で30秒を測るのだ！");
-            
-            await playAudio(audioFiles.start); // ④・⑨ スタートの合図ボイス
             
             currentEarthCount = 0;
             finalCorrectAnswer = 0;
             let hasRecorded30s = false;
 
             const startTime = audioContext.currentTime;
-            const gameDuration = 50; // 50秒間流すなのだ
+            const gameDuration = 50; 
 
             async function playRandomLoop() {
                 if (gameState !== "PLAYING") return;
                 
                 const elapsedTime = audioContext.currentTime - startTime;
 
-                // 30秒経過した瞬間のカウントを正解としてキープするのだ
                 if (elapsedTime >= 30 && !hasRecorded30s) {
                     finalCorrectAnswer = currentEarthCount;
                     hasRecorded30s = true;
                     console.log("【30秒通過】正解の数を固定したのだ：", finalCorrectAnswer);
                 }
 
-                // ⑤ 50秒が経過したら即座にストップして⑥へ行くのだ
                 if (elapsedTime >= gameDuration) {
                     if (currentSource) {
                         try { currentSource.stop(); } catch(e) {}
@@ -205,9 +197,8 @@
                 let nextFile = "";
                 let isOkyu = false;
 
-                // ⑤ 初級と中級のランダム条件分岐なのだ
                 if (selectedMode === "中級" && Math.random() < 0.20) {
-                    nextFile = audioFiles.okyu_normal; // 中級なら20%でお灸
+                    nextFile = audioFiles.okyu_normal; 
                     isOkyu = true;
                 } else {
                     const earthPool = [
@@ -241,7 +232,7 @@
             gameState = "ANSWER_SELECT";
             updateText("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            await playAudio(audioFiles.kotaego); // ⑥ 答えを促すボイス
+            await playAudio(audioFiles.kotaego); 
             startVoiceRecognition(handleAnswerResult);
         }
 
@@ -251,21 +242,18 @@
             
             const spokenNumber = transcript.replace(/[^0-9]/g, '');
             
-            await playAudio(audioFiles.kettei); // 決定音
+            await playAudio(audioFiles.kettei); 
 
-            // ⑦ 正解・不正解の判定とボイス再生
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
                 updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
-                await playAudio(audioFiles.seikai); // 正解ボイス
+                await playAudio(audioFiles.seikai); 
             } else {
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); // 不正解ボイス
+                await playAudio(audioFiles.hazure); 
                 
-                // 不正解のあとにPC音声で正解を読み上げるのだ
                 await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
-            // ⑧・⑨ ループ処理！自動的に次の難易度選択（⑧）へ戻って繰り返すのだ
             askModeSelection();
         }
 
@@ -294,14 +282,18 @@
             };
         }
 
-        // 難易度の声を聞き取ったら、余計なキー入力を挟まずにすぐ④・⑨のスタートへ直行するのだ！
-        function handleModeResult(transcript) {
+        // ★【バグ修正箇所】async/awaitを導入し、スタート音を鳴らし終わってから本編へ進むようにしたのだ！
+        async function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                startGamePlay(); // 👈 ここで直接④・⑨の再生へジャンプ！
+                updateText("ゲームスタート！心の中で30秒を測るのだ！");
+                await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
+                startGamePlay(); 
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                startGamePlay(); // 👈 同上なのだ！
+                updateText("ゲームスタート！心の中で30秒を測るのだ！");
+                await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
+                startGamePlay(); 
             } else {
                 askModeSelection();
             }
@@ -320,7 +312,6 @@
             osc.stop(audioContext.currentTime + duration);
         }
 
-        // 単一のテキストエリアのみを書き換える、安全な新関数なのだ
         function updateText(text) {
             document.getElementById("game-text").innerText = text;
         }
