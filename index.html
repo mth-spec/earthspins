@@ -37,11 +37,10 @@
         let audioContext = null;
         let isAudioPlaying = false;
         
-        // ★現在再生中の音源をコントロールするための大事な変数なのだ！
         let currentSource = null; 
         let gameLoopTimeout = null;
 
-        // 音声認識（Web Speech API）の準備なのだ
+        // 音声認識（Web Speech API）の準備
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         if (SpeechRecognition) {
@@ -70,7 +69,6 @@
 
         // --- キーボード入力の処理 ---
         window.addEventListener("keydown", (event) => {
-            // 音声案内中や本編プレイ中は、キー入力を完全にガードして暴走を防ぐなのだ！
             if (isAudioPlaying || gameState === "PLAYING") return; 
 
             if (gameState === "WAIT_INITIAL_KEY") {
@@ -91,12 +89,11 @@
             }
         }
 
-        // ★強化された音声再生関数（前の音が残っていたら強制ストップするのだ！）
+        // 音声再生関数
         function playAudio(url) {
             return new Promise((resolve, reject) => {
                 isAudioPlaying = true;
                 
-                // もし前に再生した音が残っていたら、ここで完全に消滅させるなのだ！
                 if (currentSource) {
                     try { currentSource.stop(); } catch(e) {}
                     currentSource = null;
@@ -106,7 +103,6 @@
                     .then(response => response.arrayBuffer())
                     .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
                     .then(audioBuffer => {
-                        // 再生中にゲーム状態が変わってたら（50秒終了時など）再生しないのだ
                         if (url.includes("earth") || url.includes("okyu")) {
                             if (gameState !== "PLAYING") {
                                 isAudioPlaying = false;
@@ -119,7 +115,7 @@
                         source.buffer = audioBuffer;
                         source.connect(audioContext.destination);
                         
-                        currentSource = source; // 現在の音源としてキープ！
+                        currentSource = source;
 
                         source.onended = () => {
                             isAudioPlaying = false;
@@ -135,6 +131,23 @@
                         isAudioPlaying = false;
                         resolve(); 
                     });
+            });
+        }
+
+        // PCの合成音声でテキストを喋らせる関数（不正解のときに大活躍なのだ！）
+        function speakText(text) {
+            return new Promise((resolve) => {
+                if (!window.speechSynthesis) {
+                    resolve();
+                    return;
+                }
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = "ja-JP";
+                utterance.rate = 1.0; // 読み上げ速度（標準）
+                utterance.onend = () => {
+                    resolve();
+                };
+                window.speechSynthesis.speak(utterance);
             });
         }
 
@@ -158,13 +171,11 @@
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④ ゲームスタートの待機案内
-        async function prepareForStart() {
+        // ④ ゲームスタートの待機案内（※バグの原因だったkotaegoの先走りを完全削除！）
+        function prepareForStart() {
             gameState = "READY_TO_START";
             updateStatus("スペースキーを押すとカウントダウンが始まるのだ！");
-            
-            await playAudio(audioFiles.kotaego); 
-            isAudioPlaying = false; // 次のスペースキーを受け付けるためにフラグを強制解除するなのだ！
+            isAudioPlaying = false; // すぐにプレイヤーのスペースキー入力を受け付ける状態にするなのだ！
         }
 
         // ⑤ 本編（50秒間ランダム再生・30秒ロック）
@@ -193,7 +204,7 @@
                     console.log("【30秒通過】正解を固定したのだ：", finalCorrectAnswer);
                 }
 
-                // ★50秒が経過したら、即座にループを完全に断ち切るのだ！
+                // 50秒が経過したら、即座にループを完全に断ち切る
                 if (elapsedTime >= gameDuration) {
                     if (currentSource) {
                         try { currentSource.stop(); } catch(e) {}
@@ -225,7 +236,6 @@
 
                 await playAudio(nextFile);
                 
-                // 次の音が出るまでの無音の隙間
                 const randomDelay = (Math.random() * 600) + 200;
                 
                 if (gameState === "PLAYING") {
@@ -242,6 +252,7 @@
             gameState = "ANSWER_SELECT";
             updateStatus("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
+            // ここで満を持して「30秒のときに言っていたのは地球が何回目だったのか〜」を再生！
             await playAudio(audioFiles.kotaego);
             startVoiceRecognition(handleAnswerResult);
         }
@@ -258,8 +269,11 @@
                 updateStatus(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
                 await playAudio(audioFiles.seikai);
             } else {
-                updateStatus(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回（50秒では${currentEarthCount}回）`);
-                await playAudio(audioFiles.hazure);
+                updateStatus(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
+                await playAudio(audioFiles.hazure); // まず「ハズレなのだ」ファイルを再生
+                
+                // ★【新機能】その直後に、PC音声が優しく正解を読み上げるのだ！
+                await speakText(`正解は、${finalCorrectAnswer}回でした。`); 
             }
 
             // ⑧・⑨ 無限ループ処理で難易度選択へ戻る
