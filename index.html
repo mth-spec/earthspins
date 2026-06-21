@@ -27,8 +27,8 @@
     <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
 
     <script>
-        // --- ゲームの状態管理（ステート） ---
-        let gameState = "WAIT_INITIAL_KEY"; // WAIT_INITIAL_KEY, INTRO, MODE_SELECT, PLAYING, ANSWER_SELECT
+        // --- ゲームの状態管理 ---
+        let gameState = "WAIT_INITIAL_KEY"; 
         let selectedMode = ""; 
         let currentEarthCount = 0; 
         let finalCorrectAnswer = 0; 
@@ -53,7 +53,7 @@
             title: "zundamon_title.wav",
             intro: "zundamon_intro.wav",
             sentaku: "zundamon_sentaku.wav",
-            start: "zundamon_start.wav",
+            start: "zundamon_start.wav", // ★このファイルは使用せず、PCの機械音だけでスタートします
             kotaego: "zundamon_kotaego.wav",
             seikai: "zundamon_seikai.wav",
             hazure: "zundamon_hazure.wav",
@@ -65,14 +65,13 @@
             kettei: "kettei.mp3"
         };
 
-        // --- キーボード入力の処理 ---
-        // ★最初の起動時（WAIT_INITIAL_KEY）だけキーを受け付け、それ以降は使いません
+        // --- ① 最初のキー入力処理 ---
         window.addEventListener("keydown", (event) => {
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     initAudio();
-                    startIntroFlow(); 
+                    startIntroFlow(); // ①の流れへ
                 }
             }
         });
@@ -121,60 +120,45 @@
                         source.start();
                     })
                     .catch(e => {
-                        console.error("音声再生エラーなのだ:", e);
+                        console.error("音声再生エラー:", e);
                         isAudioPlaying = false;
                         resolve(); 
                     });
             });
         }
 
-        // PCの合成音声関数
-        function speakText(text) {
-            return new Promise((resolve) => {
-                if (!window.speechSynthesis) {
-                    resolve();
-                    return;
-                }
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = "ja-JP";
-                utterance.rate = 1.0; 
-                utterance.onend = () => {
-                    resolve();
-                };
-                window.speechSynthesis.speak(utterance);
-            });
-        }
-
-        // ①・② イントロの流れ
+        // ①・② 最初のイントロ再生の流れ
         async function startIntroFlow() {
             gameState = "INTRO";
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title); 
-            await playAudio(audioFiles.intro); 
+            await playAudio(audioFiles.title); // ① タイトル再生
+            await playAudio(audioFiles.intro); // ② イントロ再生
             
-            askModeSelection(); 
+            askModeSelection(); // ③へ
         }
 
-        // ③ 難易度選択（および ⑧の再選択）
+        // ③・⑧ 難易度選択（何回目でも必ずここを通るのだ）
         async function askModeSelection() {
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); 
+            await playAudio(audioFiles.sentaku); // ③・⑧ 難易度選択ボイス
             startVoiceRecognition(handleModeResult);
         }
 
-        // ★声を聞き取ったあと、ピッと鳴ってそのまま自動でここへ直行するのだ！
-        async function triggerGameStart() {
+        // ④・⑨ スタート合図（あなたの指示通り、zundamon_start.wavは流さず機械音のみ！）
+        function triggerGameStart() {
             gameState = "PLAYING";
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
-            
-            await playAudio(audioFiles.start); // ④・⑨ しっかりスタート音を鳴らす！
-            startGamePlay(); 
+
+            // ④・⑨ 毎回必ずPCの機械音「ピ！」を高めに鳴らして、そのまま間髪入れずに本編へ！
+            playBeep(880, 0.15); 
+
+            startGamePlay(); // ⑤の本編へ直行！
         }
 
-        // ⑤ 本編再生
+        // ⑤ 本編再生（50秒間のランダムループ）
         function startGamePlay() {
             currentEarthCount = 0;
             finalCorrectAnswer = 0;
@@ -199,15 +183,16 @@
                         try { currentSource.stop(); } catch(e) {}
                         currentSource = null;
                     }
-                    endGamePlay();
+                    endGamePlay(); // ⑥へ
                     return;
                 }
 
                 let nextFile = "";
                 let isOkyu = false;
 
+                // ⑤ 初級・中級のランダム条件分岐
                 if (selectedMode === "中級" && Math.random() < 0.20) {
-                    nextFile = audioFiles.okyu_normal; 
+                    nextFile = audioFiles.okyu_normal; // 中級なら20%でお灸
                     isOkyu = true;
                 } else {
                     const earthPool = [
@@ -235,46 +220,44 @@
             playRandomLoop();
         }
 
-        // ⑥ 50秒で止めて回答へ誘導
+        // ⑥ 50秒で止めて答えを促す
         async function endGamePlay() {
             clearTimeout(gameLoopTimeout);
             gameState = "ANSWER_SELECT";
             updateText("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            await playAudio(audioFiles.kotaego); 
+            await playAudio(audioFiles.kotaego); // ⑥ zundamon_kotaego.wav 再生
             startVoiceRecognition(handleAnswerResult);
         }
 
         // ⑦ プレイヤーの回答の判定
         async function handleAnswerResult(transcript) {
             updateText(`あなたの答え: ${transcript}`);
-            
             const spokenNumber = transcript.replace(/[^0-9]/g, '');
             
-            await playAudio(audioFiles.kettei); 
+            await playAudio(audioFiles.kettei); // 決定音
 
+            // ⑦ 正解・不正解ボイスの再生
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
                 updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
                 await playAudio(audioFiles.seikai); 
             } else {
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
                 await playAudio(audioFiles.hazure); 
-                
-                await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
-            // ⑧ ループ処理！自動的に次の難易度選択（⑧）へ戻るのだ
+            // ⑧ 自動的に難易度選択へ戻って無限ループ！
             askModeSelection();
         }
 
-        // --- 音声認識（マイク入力）の共通制御 ---
+        // --- 音声認識（マイク入力）の制御 ---
         function startVoiceRecognition(callbackSuccess) {
             if (!recognition) {
                 alert("このブラウザは音声認識に対応していないのだ。");
                 return;
             }
 
-            playBeep(440, 0.1); // マイクを開くときの「ピ」の音なのだ
+            playBeep(440, 0.1); // マイクを開く合図の低い「ピ」
             try { recognition.start(); } catch(e) {}
 
             recognition.onresult = (event) => {
@@ -283,7 +266,7 @@
             };
 
             recognition.onerror = (event) => {
-                console.error("音声認識エラーなのだ:", event.error);
+                console.error("音声認識エラー:", event.error);
                 if (gameState === "MODE_SELECT") {
                     askModeSelection();
                 } else if (gameState === "ANSWER_SELECT") {
@@ -292,21 +275,20 @@
             };
         }
 
-        // ★【大改造】声を聞き取ったら、PCの「ピ」を鳴らしてそのまま間髪入れずに自動スタート！
+        // 難易度の声を聞き取った瞬間の処理
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                playBeep(880, 0.15); // 確定の「ピ！」という高めの合図音なのだ
-                triggerGameStart();  // そのまま自動で ④・⑨ へ突撃！
+                triggerGameStart(); // 余計な音を挟まずにそのまま機械音スタートへ！
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                playBeep(880, 0.15); // 確定の「ピ！」という高めの合図音なのだ
-                triggerGameStart();  // 同上なのだ！
+                triggerGameStart(); // 同上なのだ！
             } else {
                 askModeSelection();
             }
         }
 
+        // PCの機会音を鳴らす関数
         function playBeep(freq, duration) {
             if (!audioContext) return;
             const osc = audioContext.createOscillator();
