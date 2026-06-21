@@ -49,12 +49,11 @@
         }
 
         // --- 音声ファイルの設定 ---
-        // ★ あなたの大切な音声ファイルをすべて完璧にセットしてあるのだ！
+        // ★ 指示通り、zundamon_start.wav はここからも完全に削除したのだ！
         const audioFiles = {
             title: "zundamon_title.wav",
             intro: "zundamon_intro.wav",
             sentaku: "zundamon_sentaku.wav",
-            start: "zundamon_start.wav", // 👈 ここにしっかり入っているのだ！
             kotaego: "zundamon_kotaego.wav",
             seikai: "zundamon_seikai.wav",
             hazure: "zundamon_hazure.wav",
@@ -72,7 +71,7 @@
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     initAudio();
-                    startIntroFlow(); // ①・②へ進むのだ
+                    startIntroFlow(); // ①・②へ進む
                 }
             }
         });
@@ -136,30 +135,27 @@
             await playAudio(audioFiles.title); // ①
             await playAudio(audioFiles.intro); // ②
             
-            askModeSelection(); // ③へ
+            askModeSelection(); // ③へ自動進行
         }
 
-        // ③・⑧ 難易度選択
+        // ③・⑧ 難易度選択（回答後もここに戻る）
         async function askModeSelection() {
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); // ③・⑧
+            await playAudio(audioFiles.sentaku); // ③・⑧ 難易度選択ボイス
             startVoiceRecognition(handleModeResult);
         }
 
-        // ★【大復活】④・⑨ プレイヤーの指定通り、PCの「ピ！」が鳴り、直後に zundamon_start.wav が流れるのだ！
-        async function triggerGameStart() {
+        // ★【④・⑨の統合修正】声を聞き取ったら、PCの「ピ！」だけで即座にスタートするのだ！
+        function triggerGameStart() {
             gameState = "PLAYING";
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
 
-            // 1. まずPCの機械音「ピ！」を鳴らす！（④・⑨の開始合図）
+            // 開始の合図として、PCの機械音「ピッ！」を鳴らす
             playBeep(880, 0.15); 
 
-            // 2. 間髪入れずに、あなたの zundamon_start.wav をしっかり再生して、鳴り終わるのを待つ（await）のだ！
-            await playAudio(audioFiles.start); 
-
-            // 3. スタートボイスが鳴り終わったその瞬間に、50秒の本編（⑤）が自動スタートするのだ！
+            // 余計な非同期処理やファイル再生を挟まないため、ここから間髪入れずに本編（⑤）が即時スタートするのだ！
             startGamePlay(); 
         }
 
@@ -244,13 +240,13 @@
 
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
                 updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
-                await playAudio(audioFiles.seikai); // ⑦ 正解ボイス
+                await playAudio(audioFiles.seikai); // ⑦ 正解
             } else {
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); // ⑦ 不正解ボイス
+                await playAudio(audioFiles.hazure); // ⑦ 不正解
             }
 
-            // ⑧ 自動で次の周回の難易度選択へループなのだ！
+            // ⑧ 自動で次の周回の難易度選択へループ
             askModeSelection();
         }
 
@@ -261,7 +257,7 @@
                 return;
             }
 
-            playBeep(440, 0.1); // マイクを開く合図の低い「ピ」
+            playBeep(440, 0.1); // マイクが開く合図の低い「ピ」
             try { recognition.start(); } catch(e) {}
 
             recognition.onresult = (event) => {
@@ -282,15 +278,16 @@
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                triggerGameStart(); // ④・⑨ のスタート処理へ！
+                triggerGameStart(); // ④・⑨ の機械音スタートへ直結
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                triggerGameStart(); // 同上なのだ！
+                triggerGameStart(); // 同上
             } else {
                 askModeSelection();
             }
         }
 
+        // PCの機械音（合図音）を鳴らす関数
         function playBeep(freq, duration) {
             if (!audioContext) return;
             const osc = audioContext.createOscillator();
