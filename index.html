@@ -24,7 +24,7 @@
 <body>
 
     <h1>地球が何回回った日？</h1>
-    <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
+    <p id="game-text" aria-live="polite">エンターキーかスペースキーをポンと押して離すと、ずんだもんの音声案内が始まります。</p>
 
     <script>
         // --- ゲームの状態管理 ---
@@ -64,25 +64,24 @@
             kettei: "kettei.mp3"
         };
 
-        // --- ① 最初のキー入力処理（重要：関数として独立させたのだ） ---
+        // --- ① 最初のキー入力処理（★連打防止のため keyup に変更したのだ！） ---
         function handleInitialKey(event) {
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     
-                    // ★【超絶重要】キーが押された瞬間、このキーボード受付自体をこの世から完全に消し去るのだ！
-                    // これにより、ブラウザによる2回目以降の「嘘の連打信号」は100%遮断され、タイトルが重複しなくなるのだ！
-                    window.removeEventListener("keydown", handleInitialKey);
+                    // キーが「離された瞬間」に即座にイベント監視を消去！これで2回重複は絶対起きないのだ！
+                    window.removeEventListener("keyup", handleInitialKey);
                     
-                    gameState = "INTRO"; // 状態を一瞬で切り替えて二度と最初の画面に戻さないのだ
+                    gameState = "INTRO"; 
                     initAudio();
-                    startIntroFlow(); // ①・②の流れへ
+                    startIntroFlow(); 
                 }
             }
         }
 
-        // 最初のキー入力を監視開始するのだ
-        window.addEventListener("keydown", handleInitialKey);
+        // keyup（キーを離したとき）を監視するのだ
+        window.addEventListener("keyup", handleInitialKey);
 
         function initAudio() {
             if (!audioContext) {
@@ -135,34 +134,54 @@
             });
         }
 
+        // PCの合成音声（機会声）関数
+        function speakText(text) {
+            return new Promise((resolve) => {
+                if (!window.speechSynthesis) {
+                    resolve();
+                    return;
+                }
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = "ja-JP";
+                utterance.rate = 1.0; 
+                utterance.onend = () => {
+                    resolve();
+                };
+                window.speechSynthesis.speak(utterance);
+            });
+        }
+
         // ①・② イントロ再生
         async function startIntroFlow() {
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title); // ① ここが絶対に2回重複しなくなるのだ！
+            await playAudio(audioFiles.title); // ① ここが1回だけ綺麗に鳴るのだ！
             await playAudio(audioFiles.intro); // ②
             
-            askModeSelection(); // ③へ自動進行
+            askModeSelection(); // ③へ
         }
 
-        // ③・⑧ 難易度選択（何周しても必ずここを通るのだ）
+        // ③・⑧ 難易度選択
         async function askModeSelection() {
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); // ③・⑧
+            await playAudio(audioFiles.sentaku); 
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④・⑨ 声を聞き取ったら、PCの「ピ！」だけで即座にスタートなのだ！
-        function triggerGameStart() {
+        // ★【大修正】④・⑨ 機械音のあとに「数える余裕」を差し込むのだ！
+        async function triggerGameStart() {
             gameState = "PLAYING";
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
 
-            // 開始の合図音（ピッ！）
+            // 開始の合図音「ピッ！」
             playBeep(880, 0.15); 
 
-            // 余計なボイスファイルを一切待たないので、完全に綺麗に本編（⑤）がスタートするのだ
+            // ★ここで800ミリ秒（0.8秒）の間を空けて、プレイヤーが身構える余裕を作るのだ！
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            // タメをしっかりと作ったあとに、満を持して地球（⑤）がスタートなのだ！
             startGamePlay(); 
         }
 
@@ -198,7 +217,6 @@
                 let nextFile = "";
                 let isOkyu = false;
 
-                // ⑤ 初級・中級の条件分岐
                 if (selectedMode === "中級" && Math.random() < 0.20) {
                     nextFile = audioFiles.okyu_normal; 
                     isOkyu = true;
@@ -234,7 +252,7 @@
             gameState = "ANSWER_SELECT";
             updateText("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            await playAudio(audioFiles.kotaego); // ⑥
+            await playAudio(audioFiles.kotaego); 
             startVoiceRecognition(handleAnswerResult);
         }
 
@@ -243,17 +261,20 @@
             updateText(`あなたの答え: ${transcript}`);
             const spokenNumber = transcript.replace(/[^0-9]/g, '');
             
-            await playAudio(audioFiles.kettei); 
+            await playAudio(audioFiles.kettei); // 決定音
 
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
                 updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
-                await playAudio(audioFiles.seikai); // ⑦ 正解ボイス
+                await playAudio(audioFiles.seikai); 
             } else {
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); // ⑦ 不正解ボイス
+                await playAudio(audioFiles.hazure); // ずんだもんのハズレボイス
+                
+                // ★【復活！】ボイスのあとに、PCの機械声（合成音声）で正解をアナウンスするのだ！
+                await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
-            // ⑧ 自動で次の周回の難易度選択へ完全ループなのだ！
+            // ⑧ 自動で次の周回の難易度選択へループ
             askModeSelection();
         }
 
@@ -264,7 +285,7 @@
                 return;
             }
 
-            playBeep(440, 0.1); // マイクを開く合図の低い「ピ」
+            playBeep(440, 0.1); // マイクを開く低い「ピ」
             try { recognition.start(); } catch(e) {}
 
             recognition.onresult = (event) => {
@@ -285,16 +306,15 @@
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                triggerGameStart(); // ④・⑨ の機械音スタートへ直結
+                triggerGameStart(); 
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
-                triggerGameStart(); // 同上なのだ！
+                triggerGameStart(); 
             } else {
                 askModeSelection();
             }
         }
 
-        // PCの機械音（合図音）を鳴らす関数
         function playBeep(freq, duration) {
             if (!audioContext) return;
             const osc = audioContext.createOscillator();
