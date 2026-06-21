@@ -49,11 +49,12 @@
         }
 
         // --- 音声ファイルの設定 ---
+        // ★ あなたの大切な音声ファイルをすべて完璧にセットしてあるのだ！
         const audioFiles = {
             title: "zundamon_title.wav",
             intro: "zundamon_intro.wav",
             sentaku: "zundamon_sentaku.wav",
-            start: "zundamon_start.wav", // ★このファイルは使用せず、PCの機械音だけでスタートします
+            start: "zundamon_start.wav", // 👈 ここにしっかり入っているのだ！
             kotaego: "zundamon_kotaego.wav",
             seikai: "zundamon_seikai.wav",
             hazure: "zundamon_hazure.wav",
@@ -71,7 +72,7 @@
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     initAudio();
-                    startIntroFlow(); // ①の流れへ
+                    startIntroFlow(); // ①・②へ進むのだ
                 }
             }
         });
@@ -127,35 +128,39 @@
             });
         }
 
-        // ①・② 最初のイントロ再生の流れ
+        // ①・② イントロ再生
         async function startIntroFlow() {
             gameState = "INTRO";
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title); // ① タイトル再生
-            await playAudio(audioFiles.intro); // ② イントロ再生
+            await playAudio(audioFiles.title); // ①
+            await playAudio(audioFiles.intro); // ②
             
             askModeSelection(); // ③へ
         }
 
-        // ③・⑧ 難易度選択（何回目でも必ずここを通るのだ）
+        // ③・⑧ 難易度選択
         async function askModeSelection() {
             gameState = "MODE_SELECT";
             updateText("初級か中級、どっちにするか声で教えてね！");
             
-            await playAudio(audioFiles.sentaku); // ③・⑧ 難易度選択ボイス
+            await playAudio(audioFiles.sentaku); // ③・⑧
             startVoiceRecognition(handleModeResult);
         }
 
-        // ④・⑨ スタート合図（あなたの指示通り、zundamon_start.wavは流さず機械音のみ！）
-        function triggerGameStart() {
+        // ★【大復活】④・⑨ プレイヤーの指定通り、PCの「ピ！」が鳴り、直後に zundamon_start.wav が流れるのだ！
+        async function triggerGameStart() {
             gameState = "PLAYING";
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
 
-            // ④・⑨ 毎回必ずPCの機械音「ピ！」を高めに鳴らして、そのまま間髪入れずに本編へ！
+            // 1. まずPCの機械音「ピ！」を鳴らす！（④・⑨の開始合図）
             playBeep(880, 0.15); 
 
-            startGamePlay(); // ⑤の本編へ直行！
+            // 2. 間髪入れずに、あなたの zundamon_start.wav をしっかり再生して、鳴り終わるのを待つ（await）のだ！
+            await playAudio(audioFiles.start); 
+
+            // 3. スタートボイスが鳴り終わったその瞬間に、50秒の本編（⑤）が自動スタートするのだ！
+            startGamePlay(); 
         }
 
         // ⑤ 本編再生（50秒間のランダムループ）
@@ -175,7 +180,7 @@
                 if (elapsedTime >= 30 && !hasRecorded30s) {
                     finalCorrectAnswer = currentEarthCount;
                     hasRecorded30s = true;
-                    console.log("【30秒通過】正解の数を固定したのだ：", finalCorrectAnswer);
+                    console.log("【30秒通過】正解を固定したのだ：", finalCorrectAnswer);
                 }
 
                 if (elapsedTime >= gameDuration) {
@@ -190,9 +195,9 @@
                 let nextFile = "";
                 let isOkyu = false;
 
-                // ⑤ 初級・中級のランダム条件分岐
+                // ⑤ 初級・中級の条件分岐
                 if (selectedMode === "中級" && Math.random() < 0.20) {
-                    nextFile = audioFiles.okyu_normal; // 中級なら20%でお灸
+                    nextFile = audioFiles.okyu_normal; 
                     isOkyu = true;
                 } else {
                     const earthPool = [
@@ -220,13 +225,13 @@
             playRandomLoop();
         }
 
-        // ⑥ 50秒で止めて答えを促す
+        // ⑥ 50秒で止めて回答へ誘導
         async function endGamePlay() {
             clearTimeout(gameLoopTimeout);
             gameState = "ANSWER_SELECT";
             updateText("50秒経ったのだ！30秒の時の答えを言うのだ！");
             
-            await playAudio(audioFiles.kotaego); // ⑥ zundamon_kotaego.wav 再生
+            await playAudio(audioFiles.kotaego); // ⑥
             startVoiceRecognition(handleAnswerResult);
         }
 
@@ -235,22 +240,21 @@
             updateText(`あなたの答え: ${transcript}`);
             const spokenNumber = transcript.replace(/[^0-9]/g, '');
             
-            await playAudio(audioFiles.kettei); // 決定音
+            await playAudio(audioFiles.kettei); 
 
-            // ⑦ 正解・不正解ボイスの再生
             if (parseInt(spokenNumber) === finalCorrectAnswer) {
                 updateText(`正解なのだ！ 30秒時点の答えは ${finalCorrectAnswer}回 でした！`);
-                await playAudio(audioFiles.seikai); 
+                await playAudio(audioFiles.seikai); // ⑦ 正解ボイス
             } else {
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
-                await playAudio(audioFiles.hazure); 
+                await playAudio(audioFiles.hazure); // ⑦ 不正解ボイス
             }
 
-            // ⑧ 自動的に難易度選択へ戻って無限ループ！
+            // ⑧ 自動で次の周回の難易度選択へループなのだ！
             askModeSelection();
         }
 
-        // --- 音声認識（マイク入力）の制御 ---
+        // --- 音声認識の制御 ---
         function startVoiceRecognition(callbackSuccess) {
             if (!recognition) {
                 alert("このブラウザは音声認識に対応していないのだ。");
@@ -266,7 +270,7 @@
             };
 
             recognition.onerror = (event) => {
-                console.error("音声認識エラー:", event.error);
+                console.error("音声認識エラーなのだ:", event.error);
                 if (gameState === "MODE_SELECT") {
                     askModeSelection();
                 } else if (gameState === "ANSWER_SELECT") {
@@ -275,11 +279,10 @@
             };
         }
 
-        // 難易度の声を聞き取った瞬間の処理
         function handleModeResult(transcript) {
             if (transcript.includes("初級") || transcript.includes("しょきゅう")) {
                 selectedMode = "初級";
-                triggerGameStart(); // 余計な音を挟まずにそのまま機械音スタートへ！
+                triggerGameStart(); // ④・⑨ のスタート処理へ！
             } else if (transcript.includes("中級") || transcript.includes("ちゅうきゅう")) {
                 selectedMode = "中級";
                 triggerGameStart(); // 同上なのだ！
@@ -288,7 +291,6 @@
             }
         }
 
-        // PCの機会音を鳴らす関数
         function playBeep(freq, duration) {
             if (!audioContext) return;
             const osc = audioContext.createOscillator();
