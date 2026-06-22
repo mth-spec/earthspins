@@ -83,6 +83,27 @@
                 }
             }
         });
+window.addEventListener("keydown", (event) => {
+    console.log("KEY", event.key, gameState);
+
+    if (gameState === "WAIT_INITIAL_KEY") {
+        if (event.key === "Enter" || event.key === " ") {
+
+            console.log("START INTRO");
+
+            event.preventDefault();
+
+            if (isTitleStarted) return;
+
+            isTitleStarted = true;
+
+            gameState = "INTRO";
+            initAudio();
+            startIntroFlow();
+        }
+    }
+});
+
 
         function initAudio() {
             if (!audioContext) {
