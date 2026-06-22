@@ -24,7 +24,7 @@
 <body>
 
     <h1>地球が何回回った日？</h1>
-    <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
+    <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ゲームの説明が音声で始まります。</p>
 
     <script>
         // --- ゲームの状態管理 ---
@@ -68,21 +68,21 @@
         };
 
         // --- ① 最初のキー入力処理（keydown に戻し、フラグで完全ガードするのだ！） ---
-        window.addEventListener("keydown", (event) => {
-            if (gameState === "WAIT_INITIAL_KEY") {
-                if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    
-                    // ★もしすでにタイトルが始まっていたら、どんな信号が来ても即座にゴミ箱行き（帰る）なのだ！
-                    if (isTitleStarted) return;
-                    isTitleStarted = true; // 入った瞬間に鍵をガチッと閉めるのだ！
-                    
-                    gameState = "INTRO"; 
-                    initAudio();
-                    startIntroFlow(); 
-                }
+        function handleInitialKey(event) {
+            if (gameState !== "WAIT_INITIAL_KEY") return;
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                
+                if (isTitleStarted) return;
+                isTitleStarted = true; // 入った瞬間に鍵をガチッと閉めるのだ！
+                window.removeEventListener("keydown", handleInitialKey); // 二度と最初のキー入力を受け付けない
+
+                gameState = "INTRO"; 
+                initAudio();
+                startIntroFlow(); 
             }
-        });
+        }
+        window.addEventListener("keydown", handleInitialKey);
 
         function initAudio() {
             if (!audioContext) {
