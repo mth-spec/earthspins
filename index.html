@@ -24,7 +24,7 @@
 <body>
 
     <h1>地球が何回回った日？</h1>
-    <p id="game-text" aria-live="polite">エンターキーかスペースキーをポンと押して離すと、ずんだもんの音声案内が始まります。</p>
+    <p id="game-text" aria-live="polite">エンターキーかスペースキーを押すと、ずんだもんの音声案内が始まります。</p>
 
     <script>
         // --- ゲームの状態管理 ---
@@ -37,6 +37,9 @@
         
         let currentSource = null; 
         let gameLoopTimeout = null;
+
+        // ★【絶対防衛フラグ】タイトルが1回でも再生されたら、二度と最初のキー入力を受け付けないための鍵なのだ！
+        let isTitleStarted = false; 
 
         // 音声認識（Web Speech API）の準備
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -64,24 +67,22 @@
             kettei: "kettei.mp3"
         };
 
-        // --- ① 最初のキー入力処理（★連打防止のため keyup に変更したのだ！） ---
-        function handleInitialKey(event) {
+        // --- ① 最初のキー入力処理（keydown に戻し、フラグで完全ガードするのだ！） ---
+        window.addEventListener("keydown", (event) => {
             if (gameState === "WAIT_INITIAL_KEY") {
                 if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     
-                    // キーが「離された瞬間」に即座にイベント監視を消去！これで2回重複は絶対起きないのだ！
-                    window.removeEventListener("keyup", handleInitialKey);
+                    // ★もしすでにタイトルが始まっていたら、どんな信号が来ても即座にゴミ箱行き（帰る）なのだ！
+                    if (isTitleStarted) return;
+                    isTitleStarted = true; // 入った瞬間に鍵をガチッと閉めるのだ！
                     
                     gameState = "INTRO"; 
                     initAudio();
                     startIntroFlow(); 
                 }
             }
-        }
-
-        // keyup（キーを離したとき）を監視するのだ
-        window.addEventListener("keyup", handleInitialKey);
+        });
 
         function initAudio() {
             if (!audioContext) {
@@ -155,10 +156,10 @@
         async function startIntroFlow() {
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
-            await playAudio(audioFiles.title); // ① ここが1回だけ綺麗に鳴るのだ！
+            await playAudio(audioFiles.title); // ① フラグのおかげで、10000%ここに1回しか来ないのだ！
             await playAudio(audioFiles.intro); // ②
             
-            askModeSelection(); // ③へ
+            askModeSelection(); // ③へ自動進行
         }
 
         // ③・⑧ 難易度選択
@@ -170,7 +171,7 @@
             startVoiceRecognition(handleModeResult);
         }
 
-        // ★【大修正】④・⑨ 機械音のあとに「数える余裕」を差し込むのだ！
+        // ★【修正】④・⑨ 機械音のあと、早すぎず遅すぎない「1.3秒」のタメを作るのだ！
         async function triggerGameStart() {
             gameState = "PLAYING";
             updateText("ゲームスタート！心の中で30秒を測るのだ！");
@@ -178,10 +179,10 @@
             // 開始の合図音「ピッ！」
             playBeep(880, 0.15); 
 
-            // ★ここで800ミリ秒（0.8秒）の間を空けて、プレイヤーが身構える余裕を作るのだ！
-            await new Promise(resolve => setTimeout(resolve, 800));
+            // ★ 1300ミリ秒（1.3秒）の間を空けて、数え始める完璧な余裕を確保するのだ！
+            await new Promise(resolve => setTimeout(resolve, 1300));
 
-            // タメをしっかりと作ったあとに、満を持して地球（⑤）がスタートなのだ！
+            // しっかりと心が落ち着いたところで、地球（⑤）がスタートなのだ！
             startGamePlay(); 
         }
 
@@ -270,7 +271,7 @@
                 updateText(`ハズレなのだ！ 正解は: ${finalCorrectAnswer}回`);
                 await playAudio(audioFiles.hazure); // ずんだもんのハズレボイス
                 
-                // ★【復活！】ボイスのあとに、PCの機械声（合成音声）で正解をアナウンスするのだ！
+                // ボイスのあとに、PCの機械声（合成音声）で正解をアナウンス！
                 await speakText("正解は、" + finalCorrectAnswer + "回でした。"); 
             }
 
