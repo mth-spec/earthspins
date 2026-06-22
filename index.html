@@ -83,27 +83,6 @@
                 }
             }
         });
-window.addEventListener("keydown", (event) => {
-    console.log("KEY", event.key, gameState);
-
-    if (gameState === "WAIT_INITIAL_KEY") {
-        if (event.key === "Enter" || event.key === " ") {
-
-            console.log("START INTRO");
-
-            event.preventDefault();
-
-            if (isTitleStarted) return;
-
-            isTitleStarted = true;
-
-            gameState = "INTRO";
-            initAudio();
-            startIntroFlow();
-        }
-    }
-});
-
 
         function initAudio() {
             if (!audioContext) {
@@ -178,7 +157,6 @@ window.addEventListener("keydown", (event) => {
             updateText("ずんだもんがお喋りしているのだ。耳をすませてね！");
             
             await playAudio(audioFiles.title); // ① フラグのおかげで、10000%ここに1回しか来ないのだ！
-            await playAudio(audioFiles.intro); // ②
             
             askModeSelection(); // ③へ自動進行
         }
